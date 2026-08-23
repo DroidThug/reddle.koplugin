@@ -1,0 +1,23 @@
+{
+  "json": {
+    "errors": [],
+    "data": {
+      "things": [
+        {
+          "kind": "t1",
+          "data": {
+            "id": "p3tdbbv",
+            "author": "Chigzy",
+            "body": "Book is Wretch by Eric Larocca, it’s my next read. I’ll likely start it some time next week.",
+            "score": 1,
+            "created_utc": 1786788804.0,
+            "depth": 1,
+            "parent_id": "t1_p3tbzhd",
+            "count": null,
+            "children": null
+          }
+        }
+      ]
+    }
+  }
+}

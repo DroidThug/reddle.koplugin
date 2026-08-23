@@ -1,0 +1,30 @@
+# Credentials. reddle.lua holds a *refresh token*, which is a full account
+# credential -- it is not scoped to a session and does not expire on its own.
+# It lives in KOReader's settings directory on the device and must never be
+# copied here, not even temporarily while debugging.
+reddle.lua
+*.token
+.env
+config
+
+# Bridge state (tokens pass through it; its log is deliberately quiet, but still)
+bridge.log
+tools/**/*.log
+
+# Working notes. DESIGN.md is a design record and TODO.md is a scratchpad; both are
+# kept locally rather than published, so the repo carries README.md and nothing else
+# at the root. They are still tracked until `git rm --cached` runs once.
+DESIGN.md
+TODO.md
+docs/
+
+# Local scratch
+*.tgz
+*.zip
+/tmp/
+scratch/
+screenshots/
+
+# macOS
+.DS_Store
+._*

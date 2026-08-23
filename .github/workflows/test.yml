@@ -1,0 +1,56 @@
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+env:
+  # The KOReader the plugin is developed and verified against. Pinned, so a
+  # rename upstream shows up here as a deliberate bump rather than a surprise
+  # red build -- and so the contracts are checked against a real release rather
+  # than whatever master happens to be that morning.
+  KOREADER_VERSION: v2026.07.2
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # LuaJIT specifically, not Lua: KOReader runs LuaJIT, and the plugin uses
+      # its string/table behaviour. The specs have no other dependency -- the
+      # harness is hand-written because luarocks is not part of this toolchain.
+      - name: Install LuaJIT
+        run: sudo apt-get update && sudo apt-get install -y luajit
+
+      - name: Syntax-check every plugin file
+        run: |
+          for f in *.lua; do
+            luajit -bl "$f" > /dev/null || { echo "syntax error in $f"; exit 1; }
+          done
+
+      - name: Unit specs
+        run: luajit spec/run.lua
+
+      # A string added without regenerating the template is invisible until
+      # somebody reports English text in a translated build.
+      - name: Translation template is current
+        run: luajit tools/extract-strings.lua --check
+
+      - name: Bridge specs
+        run: bash spec/bridge_spec.sh
+
+      # Verifies every KOReader method the plugin calls actually exists. This is
+      # the check that catches an invented API -- the unit specs fake KOReader, so
+      # a method that does not exist passes them all and then crashes the reader
+      # on the device. Pinned to a tag so a KOReader rename shows up here as a
+      # deliberate bump rather than a surprise red build.
+      - name: Check KOReader API surface
+        run: |
+          git clone --depth 1 --branch "$KOREADER_VERSION" \
+            https://github.com/koreader/koreader /tmp/koreader
+          KOREADER_SRC=/tmp/koreader bash spec/koreader_api_check.sh
+
+      - name: Render every screen
+        run: luajit spec/screens.lua

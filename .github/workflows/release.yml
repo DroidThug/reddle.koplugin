@@ -1,0 +1,72 @@
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install LuaJIT
+        run: sudo apt-get update && sudo apt-get install -y luajit
+
+      # Do not ship a build that does not load. The tests workflow covers pushes
+      # to main; a tag can be cut from anywhere, so it is checked again here.
+      - name: Syntax-check every plugin file
+        run: |
+          for f in *.lua; do
+            luajit -bl "$f" > /dev/null || { echo "syntax error in $f"; exit 1; }
+          done
+
+      - name: Unit specs
+        run: luajit spec/run.lua
+
+      # The zip contains a single reddle.koplugin/ directory, so unzipping it
+      # inside koreader/plugins/ installs the plugin and nothing else. The repo
+      # root is the plugin, so the directory is built rather than copied.
+      - name: Build reddle.koplugin.zip
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          [ "$VERSION" = "$GITHUB_REF_NAME" ] && VERSION="$(git rev-parse --short HEAD)"
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+
+          # No README: it links assets/ and the rest of the repo, and a README
+          # full of broken links is worse than no README on the device.
+          mkdir -p dist/reddle.koplugin
+          cp -- *.lua OWNER LICENSE dist/reddle.koplugin/
+          cp -r l10n dist/reddle.koplugin/
+          (cd dist && zip -qr ../reddle.koplugin.zip reddle.koplugin)
+          sha256sum reddle.koplugin.zip > reddle.koplugin.zip.sha256
+          unzip -l reddle.koplugin.zip
+
+      # The version in _meta.lua is what the About screen and any plugin manager
+      # report. A tag that disagrees with it ships a build that lies about itself.
+      - name: Check the tag matches _meta.lua
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          META="$(sed -n 's/.*version *= *"\([^"]*\)".*/\1/p' _meta.lua | head -1)"
+          [ "$META" = "$VERSION" ] || {
+            echo "tag v$VERSION does not match _meta.lua version $META"; exit 1; }
+
+      - name: Publish the release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            reddle.koplugin.zip
+            reddle.koplugin.zip.sha256
+          generate_release_notes: true
+
+      - name: Keep the zip as an artifact
+        if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: reddle.koplugin
+          path: reddle.koplugin.zip
